@@ -24,3 +24,7 @@ Private-Tutor-CRM/ziv-clinic/
 # Logs
 **/*.log
 **/npm-debug.log*
+
+# Misc
+**/*.zip
+**/FETCH_HEAD
