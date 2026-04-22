@@ -1,0 +1,26 @@
+# Dependencies
+**/node_modules/
+
+# Secrets — NEVER commit these
+**/.env
+**/.env.*
+**/serviceAccountKey.json
+
+# Build output
+Private-Tutor-CRM/dist/
+Private-Tutor-CRM/dist-ssr/
+
+# Vercel
+Private-Tutor-CRM/.vercel/
+
+# Old project folder (leftover)
+Private-Tutor-CRM/ziv-clinic/
+
+# IDE & OS
+**/.DS_Store
+**/.idea/
+**/.vscode/
+
+# Logs
+**/*.log
+**/npm-debug.log*
