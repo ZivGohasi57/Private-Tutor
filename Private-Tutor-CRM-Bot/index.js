@@ -260,14 +260,47 @@ ${lesson.needsLibrary ? '📚 להזמנת חדר בספרייה: https://gilboa
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(express.json());
+
 app.get('/', (req, res) => {
   res.send('Clinic Bot is Running! 🤖');
 });
 
-// Keep-alive ping endpoint — point an uptime monitor (e.g. UptimeRobot) here
-// every 10 minutes to prevent Render free tier from sleeping
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+app.post('/sync-outlook', async (req, res) => {
+  const { title, start, end, outlookId, userId } = req.body;
+  const apiKey = req.headers['x-api-key'];
+
+  if (apiKey !== process.env.SYNC_SECRET) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  try {
+    const scheduleRef = admin.firestore().collection('schedule');
+    const snapshot = await scheduleRef.where('outlookId', '==', outlookId).get();
+
+    if (!snapshot.empty) {
+      return res.status(200).send('Event already exists');
+    }
+
+    await scheduleRef.add({
+      title,
+      start: admin.firestore.Timestamp.fromDate(new Date(start)),
+      end: admin.firestore.Timestamp.fromDate(new Date(end)),
+      outlookId,
+      userId,
+      type: 'block',
+      source: 'outlook',
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.status(201).send('Event synced successfully');
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
 });
 
 app.listen(port, () => {
