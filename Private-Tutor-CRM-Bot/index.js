@@ -278,6 +278,13 @@ app.post('/sync-outlook', async (req, res) => {
     return res.status(401).send('Unauthorized');
   }
 
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return res.status(400).send('Invalid date format');
+  }
+
   try {
     const scheduleRef = admin.firestore().collection('schedule');
     const snapshot = await scheduleRef.where('outlookId', '==', outlookId).get();
@@ -288,11 +295,11 @@ app.post('/sync-outlook', async (req, res) => {
 
     await scheduleRef.add({
       title,
-      start: admin.firestore.Timestamp.fromDate(new Date(start)),
-      end: admin.firestore.Timestamp.fromDate(new Date(end)),
+      start: admin.firestore.Timestamp.fromDate(startDate),
+      end: admin.firestore.Timestamp.fromDate(endDate),
       outlookId,
       userId,
-      type: 'block',
+      type: 'online',
       source: 'outlook',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
