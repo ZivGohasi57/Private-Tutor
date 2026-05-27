@@ -2,6 +2,7 @@ const admin = require('firebase-admin');
 const express = require('express');
 const fs = require('fs');
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+const calendarRouter = require('./calendar');
 
 if (!fs.existsSync('./serviceAccountKey.json')) {
     console.error("CRITICAL ERROR: serviceAccountKey.json not found!");
@@ -16,16 +17,15 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-const BOT_TOKEN = process.env.TELEGRAM_TOKEN; 
-const CHAT_ID = process.env.CHAT_ID; 
+const BOT_TOKEN = process.env.TELEGRAM_TOKEN;
+const CHAT_ID = process.env.CHAT_ID;
 
 let lastUpdateId = 0;
-let sentReminders = new Set(); 
+let sentReminders = new Set();
 
 const timeOptions = {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Jerusalem'};
 const dateOptions = {day: 'numeric', month: 'numeric', timeZone: 'Asia/Jerusalem'};
 const fullDateOptions = {day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Asia/Jerusalem'};
-
 
 const sendTelegramMessage = async (text) => {
   if (!BOT_TOKEN || !CHAT_ID) {
@@ -64,7 +64,7 @@ const checkForCommands = async () => {
            const now = new Date();
            const snapshot = await db.collection('schedule').get();
            const lessons = [];
-           
+
            snapshot.forEach(doc => {
              const data = doc.data();
              const start = data.start ? (data.start.toDate ? data.start.toDate() : new Date(data.start)) : null;
@@ -93,12 +93,12 @@ const checkForCommands = async () => {
            const now = new Date();
            let startMonth = now.getMonth();
            let startYear = now.getFullYear();
-           
+
            if (now.getDate() < 10) {
-               startMonth--; 
+               startMonth--;
                if (startMonth < 0) { startMonth = 11; startYear--; }
            }
-           
+
            const rangeStart = new Date(startYear, startMonth, 10);
            const rangeEnd = now;
 
@@ -106,7 +106,7 @@ const checkForCommands = async () => {
            const studentsMap = {};
            studentsSnapshot.forEach(doc => {
                const sData = doc.data();
-               studentsMap[doc.id] = sData.name; 
+               studentsMap[doc.id] = sData.name;
                if(sData.userId) studentsMap[sData.userId] = sData.name;
            });
 
@@ -116,17 +116,17 @@ const checkForCommands = async () => {
            let totalIncome = 0;
            let count = 0;
            let items = [];
-           
+
            paymentsSnapshot.forEach(doc => {
              const data = doc.data();
              let itemDate = data.date && data.date.toDate ? data.date.toDate() : new Date(data.date);
-             
+
              if (itemDate >= rangeStart && itemDate <= rangeEnd) {
                  const amount = Number(data.amount || 0);
                  if (amount > 0) {
                      totalIncome += amount;
                      count++;
-                     
+
                      let studentName = studentsMap[data.studentId] || "תלמיד לא מזוהה";
                      let icon = '💰';
                      if (data.method === 'paybox') icon = '📱';
@@ -148,11 +148,11 @@ const checkForCommands = async () => {
              else if (data.createdAt) itemDate = data.createdAt.toDate();
 
              if (itemDate && itemDate >= rangeStart && itemDate <= rangeEnd) {
-                 const price = Number(data.totalPrice || 0); 
+                 const price = Number(data.totalPrice || 0);
                  if (price > 0) {
                      totalIncome += price;
                      count++;
-                     
+
                      let title = data.courseName || "בדיקה";
                      if (data.taskName) title += ` - ${data.taskName}`;
 
@@ -172,7 +172,7 @@ const checkForCommands = async () => {
            }).join('\n');
 
            const startStr = rangeStart.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
-           
+
            const msg = `
 💰 <b>דוח הכנסות (מזומן שנכנס)</b>
 📅 מתאריך: <b>${startStr}</b>
@@ -183,7 +183,7 @@ const checkForCommands = async () => {
 <b>📝 פירוט תנועות:</b>
 ${itemsList || "אין נתונים"}
            `;
-           
+
            await sendTelegramMessage(msg.trim());
         }
       }
@@ -197,7 +197,7 @@ const checkReminders = async () => {
   try {
     const now = new Date();
     const snapshot = await db.collection('schedule').get();
-    
+
     snapshot.forEach(doc => {
       const lesson = doc.data();
       if (!lesson.reminders || !Array.isArray(lesson.reminders) || lesson.reminders.length === 0) return;
@@ -207,11 +207,11 @@ const checkReminders = async () => {
       const timeDiffMs = lessonStart.getTime() - now.getTime();
       const timeDiffMinutes = Math.round(timeDiffMs / 60000);
 
-      if (timeDiffMinutes < 0) return; 
+      if (timeDiffMinutes < 0) return;
 
       lesson.reminders.forEach(reminderMinutes => {
         const targetMinutes = Number(reminderMinutes);
-        
+
         if (timeDiffMinutes <= targetMinutes && timeDiffMinutes > targetMinutes - 2) {
           const sentKey = `${doc.id}_${targetMinutes}`;
           if (sentReminders.has(sentKey)) return;
@@ -225,8 +225,8 @@ const checkReminders = async () => {
           else if (targetMinutes >= 60) timeRemainingStr = `${Math.round(targetMinutes/60)} שעות`;
           else timeRemainingStr = `${targetMinutes} דקות`;
 
-          let typeString = lesson.type === 'frontal' 
-              ? `🏫 פרונטלי ${lesson.location ? `- ${lesson.location}` : ''}` 
+          let typeString = lesson.type === 'frontal'
+              ? `🏫 פרונטלי ${lesson.location ? `- ${lesson.location}` : ''}`
               : "💻 אונליין";
 
           const msg = `
@@ -244,9 +244,9 @@ const checkReminders = async () => {
 ${lesson.needsLibrary ? '📚 להזמנת חדר בספרייה: https://gilboaweb.afeka.ac.il/#/Dashboard' : ''}
           `;
 
-          sendTelegramMessage(msg.trim());
+          await sendTelegramMessage(msg.trim());
           sentReminders.add(sentKey);
-          
+
           setTimeout(() => sentReminders.delete(sentKey), 3600000);
         }
       });
@@ -261,6 +261,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(calendarRouter);
 
 app.get('/', (req, res) => {
   res.send('Clinic Bot is Running! 🤖');
@@ -310,15 +311,31 @@ app.post('/sync-outlook', async (req, res) => {
   }
 });
 
+const keepAlive = () => {
+  const serviceUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`;
+  fetch(`${serviceUrl}/health`)
+    .then(() => console.log("♻️  Keep-alive ping sent"))
+    .catch(err => console.warn("⚠️  Keep-alive ping failed:", err.message));
+};
+
 app.listen(port, () => {
   console.log(`Bot server listening on port ${port}`);
-  
+
   if (process.env.TELEGRAM_TOKEN) {
       console.log("✅ Token found: " + process.env.TELEGRAM_TOKEN.substring(0, 5) + "...");
   } else {
       console.error("❌ ERROR: TELEGRAM_TOKEN is missing in Render Settings!");
   }
 
-  setInterval(checkReminders, 60000); 
-  setInterval(checkForCommands, 3000); 
+  setInterval(checkReminders, 60000);
+  setInterval(checkForCommands, 3000);
+  setInterval(keepAlive, 14 * 60 * 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error("🔴 Unhandled Promise Rejection:", reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error("🔴 Uncaught Exception:", err);
 });
